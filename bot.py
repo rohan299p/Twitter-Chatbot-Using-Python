@@ -1,25 +1,30 @@
-import tweepy
+import tweepy #Python Library to communicate with Twitter platform and use its API.
 import time
-import atexit
-import sys
-import random
-from random_words import RandomWords
-from PyDictionary import PyDictionary
-import datetime
+#import atexit 
+import sys    #use to access system-specific parameters and functions.
+#import random 
+from random_words import RandomWords  #generate random words
+from PyDictionary import PyDictionary #Dictionary Module for Python to get meanings, translations, synonyms
+import datetime #work with date and time.
+import schedule #schedule some tasks at particular time interval
+import requests #library for making HTTP requests in Python
+from lxml import html #provides a special Element API for HTML elements
 
 print('Hey, SLASH here! A twitter bot.')
 
-CONSUMER_KEY='o80JZbavTzoRllgI0VH4KHtNk'
-CONSUMER_SECRET='xmgdggDVg6Y97P2DBZrBVapdVUmXsuiWYugZ0rR17YjyrTI9NI'
-ACCESS_KEY='1317182765385699328-0GzU0Un9xhjrPNkYTVaoy5CCsNFwAC'
-ACCESS_SECRET='ggdpyLo23rAgzyZQqhbIcUBjiHs7Jqe3WkWHnknqb6coS'
+#API keys
+CONSUMER_KEY='JkCAwpR61ACt4uAPNXE60J5kM'
+CONSUMER_SECRET='wZELp6zTjvBxhWjMVaRhJ3DP7BpOg0Utx9v9jQlQynOncPJr58'
+ACCESS_KEY='1317182765385699328-wOlhsgnlYDQgQnlIKYVLatzqSW3gUO'
+ACCESS_SECRET='05S3TQQRHZEmiSSIweCN2kesthcItZO5jcq39TQUgDi34'
 
-auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+#authentication and access
+auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET) 
 auth.set_access_token(ACCESS_KEY, ACCESS_SECRET)
-api = tweepy.API(auth)
+api = tweepy.API(auth, wait_on_rate_limit = True, wait_on_rate_limit_notify = True)
 
 
-image='bot.jpg'
+# image='bot.jpg'
 ''' ---------------------------------------------Backup Code for Status Update-------------------------------------------
 def postStatus(update):
     try:
@@ -28,70 +33,130 @@ def postStatus(update):
         if error.api_code == 187:
             # Do something special
             print('Duplicate Message')
-
 postStatus("Hello ,ChatBotSDL is Online Now")
 '''
-def loadRandomWord():
+
+#get current date and time 
+def getDatetime():
+    now = datetime.datetime.now()
+    return now
+
+
+#tweet word and meaning every day 10:00 am
+def tweetDictionary():
+
     dictionary = PyDictionary()
-    rw=RandomWords()
+    rw = RandomWords()
 
-    word=rw.random_word()
-    definitions = dictionary.meaning(word)
+    word = rw.random_word()
+    definitions = dictionary.meaning(word)     # definitions is dictionary of two items (noun,verb)
 
-    try:
-        part_of_speech = random.choice(list(definitions.keys()))
-        definition=random.choice(definitions[part_of_speech])
-    except:
-        return "NULL DEFINITION"
+    # print('\nWord : ',word, '\nDefinitions : ', definitions)
+    # F-strings provide a way to embed expressions inside string literals, using a minimal syntax
 
-    return {
-        "word":word,
-        "definition":definition,
-        "part_of_speech":part_of_speech
-    }
+    now = getDatetime()
+    tweet = f'''Word of the Day
+    Date: {now.strftime("%y-%m-%d")}
+    Word: {word}
+    Meaning: {definitions}
+    Source: "PyDictionary"
+    '''
+    size = sys.getsizeof(tweet)
+    print('Dictionary tweet size: ', size)
 
-def tweetDaily():
+    if size < 362:
+        api.update_status(tweet)
+        print('Word tweeted successfully')
+    else:
+        print('error, loading again')
+        tweetDictionary()
+   
+schedule.every().day.at("11:25").do(tweetDictionary)
+
+
+#tweet coronavirus cases updates everyday 11:30 pm
+def covid19Update():
+    # proxyDict = {
+    #     'http' : "add http proxy",
+    #     'https' : "add https proxy"
+    # }
+
+    res = requests.get("https://www.worldometers.info/coronavirus/country/india/")
+    doc = html.fromstring(res.content)
+    totalCases, totalDeaths, totalRecovered =doc.xpath('//div[@class="maincounter-number"]/span/text()')
+
+    todayInfo = doc.xpath('//li[@class="news_li"]/strong/text()')
+
+    # print('\nConfirmed cases : ',todayInfo[0],'\nDeaths : ', todayInfo[1])
+    # print('\nTotal cases : ',totalCases,'\nTotal Recovered : ', totalRecovered,'\nTotal Deaths : ', totalDeaths)
+
+    now = getDatetime()
+
+    tweet1 = f'''India: Coronavirus Latest Updates
+    Date: {now.strftime("%y-%m-%d")}  Time: {now.strftime("%H:%M:%S")}
+    Confirmed cases: +{todayInfo[0]}
+    Deaths: +{todayInfo[1]}
+    Source: https://www.worldometers.info/coronavirus/country/india/
+
+    #coronavirus #covid19 #coronavirusnews #coronavirusupdates
+    '''
+
+    tweet2 = f'''India: Coronavirus Latest Updates
+    Date: {now.strftime("%y-%m-%d")}  Time: {now.strftime("%H:%M:%S")}
+    Total cases: {totalCases}
+    Recovered: {totalRecovered}
+    Deaths: {totalDeaths}
+    Source: https://www.worldometers.info/coronavirus/country/india/
+
+    #coronavirus #covid19 #coronavirusnews #coronavirusupdates
+    '''
+
+    # size1 = sys.getsizeof(tweet1)
+    # size2 = sys.getsizeof(tweet2)
+    # print(size1,size2)
+    
+    api.update_status(tweet1)
+    api.update_status(tweet2)
+    print('Covid19 Status updated successful')
+
+schedule.every().day.at("11:25").do(covid19Update)
+
+
+def botOffline():
     while(True):
-            word_of_the_day = loadRandomWord()
+        now = getDatetime()
+        tweet = f'''Date: {now.strftime("%y-%m-%d")}
+        Time: {now.strftime("%H:%M:%S")}  
+        Bot Status - Offline
+        '''
 
-            while(word_of_the_day == "NULL_DEFINITION"):
-                word_of_the_day=loadRandomWord()
+        print('Bot Offline')
+        api.update_status(tweet)
+        break
 
-            wotd_tweet = word_of_the_day["word"]
-            api.update_status(wotd_tweet +'--Word Of The Day , Bot Status - Online')
-            break
 
-def tweetOffline():
-    while(True):
-            word_of_the_day = loadRandomWord()
+#update bot status by tweeting
+def botOnline():
+    now = getDatetime()
+    tweet = f'''Date: {now.strftime("%y-%m-%d")}
+    Time: {now.strftime("%H:%M:%S")}  
+    Bot Status - Online
+    '''
 
-            while(word_of_the_day == "NULL_DEFINITION"):
-                word_of_the_day=loadRandomWord()
-
-            wotd_tweet = word_of_the_day["word"]
-            api.update_status(wotd_tweet +'--Word Of The Day , Bot Status - Offline ')
-            break
-
-def tweetMorning():
-    while(True):
-            word_of_the_day = loadRandomWord()
-
-            while(word_of_the_day == "NULL_DEFINITION"):
-                word_of_the_day=loadRandomWord()
-
-            wotd_tweet = word_of_the_day["word"]
-            api.update_status(wotd_tweet +'Good Morning ! ')
-            break
+    print('Bot Online')
+    api.update_status(tweet)
 
 
 file_name = 'last_seen_id.txt'
-
+#get latest mention id
 def retrieve_last_seen_id(file_name):
     f_read = open(file_name, 'r')
     last_seen_id = int(f_read.read().strip())
     f_read.close()
     return last_seen_id
 
+
+#store latest mention id
 def store_last_seen_id(last_seen_id, file_name):
     f_write = open(file_name, 'w')
     f_write.write(str(last_seen_id))
@@ -99,27 +164,41 @@ def store_last_seen_id(last_seen_id, file_name):
     return
 
 
+#like tweets of users whom our chatbot follows check every minute
+def auto_like_followers():
+    maxLimit = 5
+    for tweet in tweepy.Cursor(api.home_timeline).items(maxLimit):
+        try:
+            tweet.favorite()
+            print("tweet liked of friend whom I follow !")
+        except tweepy.TweepError as error:
+            if error.api_code == 139:
+                print('no new tweets from users which I follow !')
+        except StopIteration:
+            break
+schedule.every(1).minutes.do(auto_like_followers)
 
 
-
+#like, retweet, dm and follow who mentions our bot (checks every 15 seconds)
 def reply_to_tweets():
     FOLLOW= True
     message='Hello Sir , Feel Free to Drop your feedbacks to this DM'
     print('retrieving and replying to tweets...', flush=True)
-    # NOTE: use 1060651988453654528 for testing.
+
     # NOTE: We need to use tweet_mode='extended' below to show
     # all full tweets (with full_text). Without it, long tweets
     # would be cut off.
+
     mentions = api.mentions_timeline(retrieve_last_seen_id(file_name), tweet_mode='extended')
     for mention in reversed(mentions):
 
         #store_last_seen_id(last_seen_id, file_name)
         if '#hellobot' in mention.full_text.lower() :
-            print(str(mention.id) + ' - ' + mention.full_text, flush=True)
+            #print(str(mention.id) + ' - ' + mention.full_text, flush=True)
             try:
                 if '#like' not in mention.full_text.lower() and '#retweet' not in mention.full_text.lower() :
                     print(str(mention.id)+ ' - '+mention.full_text)
-                    api.update_status('@' + mention.user.screen_name + '#hellobot Back To You, Auto-Reply Works !', mention.id)
+                    api.update_status('@' + mention.user.screen_name + 'Hello, Back To You, Auto-Reply Works !', mention.id)
             except tweepy.TweepError as error:
                 if error.api_code == 187:
                     # Do something special
@@ -130,7 +209,7 @@ def reply_to_tweets():
                 if '#like' in mention.full_text.lower() and '#retweet' not in mention.full_text.lower():
                     try:
                         print(str(mention.id)+ ' - '+mention.full_text)
-                        api.update_status('@' + mention.user.screen_name + '#hellobot Back To You, Auto-Reply And Auto-Like Works !', mention.id)
+                        api.update_status('@' + mention.user.screen_name + 'Hello, Back To You, Auto-Reply And Auto-Like Works !', mention.id)
                     except tweepy.TweepError as error:
                         if error.api_code == 187:
                             # Do something special
@@ -142,7 +221,7 @@ def reply_to_tweets():
                 if '#retweet' in mention.full_text.lower() and '#like' not in mention.full_text.lower() :
                     try:
                         print(str(mention.id)+ ' - '+mention.full_text)
-                        api.update_status('@' + mention.user.screen_name + '#hellobot Back To You, Auto-Reply And Auto-Retweet Works !', mention.id)
+                        api.update_status('@' + mention.user.screen_name + 'Hello, Back To You, Auto-Reply And Auto-Retweet Works !', mention.id)
                     except tweepy.TweepError as error:
                         if error.api_code == 187:
                             # Do something special
@@ -154,7 +233,7 @@ def reply_to_tweets():
                 if '#retweet' in mention.full_text.lower() and '#like' in mention.full_text.lower() :
                     try:
                         print(str(mention.id)+ ' - '+mention.full_text)
-                        api.update_status('@' + mention.user.screen_name + '#hellobot Back To You, Auto-Reply ,Auto-Like And Auto-Retweet Works !', mention.id)
+                        api.update_status('@' + mention.user.screen_name + 'Hello, Back To You, Auto-Reply ,Auto-Like And Auto-Retweet Works !', mention.id)
                     except tweepy.TweepError as error:
                         if error.api_code == 187:
                             # Do something special
@@ -188,12 +267,10 @@ def reply_to_tweets():
             store_last_seen_id(mention.id, file_name)
 
 
-tweetDaily()
-
-
-
+botOnline() #bot started
 while True:
-    reply_to_tweets()
+    reply_to_tweets()      #reply to tweets 
+    schedule.run_pending() #check for pending scheduled tweets
     '''
     try:
         sys.exit( tweetOffline() )
@@ -208,167 +285,3 @@ while True:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-import tweepy
-import time
-print('Hey, SLASH here! A twitter bot.')
-
-CONSUMER_KEY='o80JZbavTzoRllgI0VH4KHtNk'
-CONSUMER_SECRET='xmgdggDVg6Y97P2DBZrBVapdVUmXsuiWYugZ0rR17YjyrTI9NI'
-ACCESS_KEY='1317182765385699328-sbNXraeTxAV8SzHJgRLPGCXJibAUNb'
-ACCESS_SECRET='DLmhIqbE5Sh4Y61VNsaq9cmxScDvMydYhntpLOONS61ZO'
-
-auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-auth.set_access_token(ACCESS_KEY, ACCESS_SECRET)
-api = tweepy.API(auth)
-
-tweets=api.mentions_timeline()
-'''
-'''
-for tweet in tweets:
-    if '#hellobot' in tweet.text.lower():
-        print(str(tweet.id) + ' - ' + tweet.text)
-'''
-
-'''
-cd
-# NOTE: I put my keys in the keys.py to separate them
-# from this main file.
-# Please refer to keys_format.py to see the format.
-from keys import *
-
-# NOTE: flush=True is just for running this script
-# with PythonAnywhere's always-on task.
-# More info: https://help.pythonanywhere.com/pages/AlwaysOnTasks/
-print('this is my twitter bot', flush=True)
-'''
-'''
-file_name = 'G:\\TE\\twitterbot\\last_seen_id.txt'
-
-def retrieve_last_seen_id(file_name):
-    f_read = open(file_name, 'r')
-    last_seen_id = int(f_read.read().strip())
-    f_read.close()
-    return last_seen_id
-
-def store_last_seen_id(last_seen_id, file_name):
-    f_write = open(file_name, 'w')
-    f_write.write(str(last_seen_id))
-    f_write.close()
-    return
-'''
-'''
-last_seen_id = retrieve_last_seen_id (FILE_NAME)
-mentions = api.mentions_timeline(last_seen_id, tweet_mode='extended')
-for mention in reversed(mentions):
-    print(str(mention.id) + ' - ' + mention.full_text)
-    last_seen_id = mention.id
-    store_last_seen_id( last_seen_id, FILE_NAME)
-    if '#hellobot' in mention.text.lower():
-            print('found #hellobot!', flush=True)
-            print('responding back...', flush=True)
-            api.update_status('@' + mention.user.screen_name + '#hellobot back to you!', mention.id)
-'''
-'''
-def reply_to_tweets():
-    print('retrieving and replying to tweets...', flush=True)
-    # DEV NOTE: use 1060651988453654528 for testing.
-    last_seen_id = retrieve_last_seen_id(file_name)
-    # NOTE: We need to use tweet_mode='extended' below to show
-    # all full tweets (with full_text). Without it, long tweets
-    # would be cut off.
-    mentions = api.mentions_timeline(last_seen_id, tweet_mode='extended')
-    for mention in reversed(mentions):
-        print(str(mention.id) + ' - ' + mention.full_text, flush=True)
-        last_seen_id = mention.id
-        store_last_seen_id(last_seen_id, file_name)
-        if '#hellobot' in mention.full_text.lower():
-            print('found #hellobot!', flush=True)
-            print('responding back...', flush=True)
-            try:
-            api.update_status('@' + mention.user.screen_name +
-                    '#hellobot Back To You , Auto-Like ,Auto -Retweet and Auto-Reply Works !', mention.id)
-            except tweepy.TweepError as error:
-            if error.api_code == 187:
-                # Do something special
-                print('duplicate message')
-            else:
-                raise error
-            api.create_favorite(mention.id)
-            api.retweet(mention.id)
-
-#while True:
-reply_to_tweets()
-    #time.sleep(15)
-    
-    '''
-    
-    
-
-
-    
